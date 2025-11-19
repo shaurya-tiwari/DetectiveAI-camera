@@ -1,6 +1,5 @@
 ultralytics
 opencv-python
-streamlit
 deep_sort_realtime
 numpy
-torch
+torch     # if you want to pin a version later, add e.g. torch==2.2.0 for CPU/GPU as needed
