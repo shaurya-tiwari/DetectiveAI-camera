@@ -4,7 +4,11 @@ from ultralytics import YOLO
 
 class Detector:
     def __init__(self, model_path="yolov8n.pt"):
+        import torch
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.model = YOLO(model_path)
+        self.model.to(device)
+        print(f"Detector initialized on {device}")
         self.names = self.model.names
         self.class_remap = None
 
