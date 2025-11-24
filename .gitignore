@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.env
+venv/
+.vscode/
+.idea/
+outputs/
+*.mp4
+*.avi
+*.mov
+!videos/sample.mp4
+weights/
+yolov8n.pt
