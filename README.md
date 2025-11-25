@@ -1,51 +1,104 @@
-# SentinelAI
+# DetectiveAI - Intelligent Surveillance System
 
-SentinelAI is a real-time intelligent surveillance prototype that analyzes video to detect security anomalies:
-- **Weapon Detection**: Detects guns and knives.
-- **Unattended Bags**: Detects bags left stationary for a configurable duration.
-- **Crowd Detection**: Alerts when the number of people exceeds a threshold.
+Real-time weapon detection and surveillance system powered by YOLOv8 and DeepSORT.
 
-Powered by **YOLOv8** for detection and **DeepSORT** for tracking.
+## Features
+
+- 🔫 **Weapon Detection** - Detects guns using specialized firearm detection model
+- 🔪 **Knife Detection** - Identifies knives and sharp objects
+- 👥 **Crowd Detection** - Alerts when crowd size exceeds threshold
+- 🎒 **Unattended Bag Detection** - Detects stationary bags left unattended
+- 📹 **Real-time Processing** - Live video analysis with tracking
+- 🎯 **Smart Alerts** - Intelligent alert system with cooldowns
 
 ## Project Structure
 
-- `src/`: Core source code.
-    - `detection.py`: YOLOv8 wrapper.
-    - `tracking.py`: DeepSORT wrapper.
-    - `rules.py`: Event logic engine.
-    - `visualize.py`: Visualization helpers.
-    - `streamlit_app.py`: Main dashboard application.
-- `videos/`: Place your demo videos here.
-- `requirements.txt`: Python dependencies.
+```
+DetectiveAI/
+├── src/                    # Core application code
+│   ├── detection.py        # YOLO detection wrapper
+│   ├── tracking.py         # DeepSORT tracking
+│   ├── rules.py            # Alert rules engine
+│   ├── visualize.py        # Visualization utilities
+│   └── streamlit_app.py    # Main dashboard application
+├── videos/                 # Sample videos for testing
+├── requirements.txt        # Python dependencies
+└── README.md              # This file
+```
 
 ## Setup
 
-1.  **Install Dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
+### 1. Install Dependencies
 
-2.  **Download Model**:
-    The system uses `yolov8n.pt` by default. It will be downloaded automatically by Ultralytics on first run, or you can place it in the root directory.
+```bash
+pip install -r requirements.txt
+```
 
-## Usage
-
-Run the Streamlit dashboard:
+### 2. Run the Application
 
 ```bash
 streamlit run src/streamlit_app.py
 ```
 
-## Features
+The firearm detection model will automatically download from Hugging Face on first run (~6MB).
 
-- **Real-time Dashboard**: View annotated video, alerts, and system status.
-- **Configurable Rules**: Adjust thresholds for crowd count, bag timer, and confidence.
-- **Video Source**: Support for sample videos, file upload, or webcam.
+## Usage
+
+1. **Select Model**: Choose between "Firearm Detection" (recommended) or "Local COCO Model"
+2. **Choose Video Source**: Sample video, upload your own, or use webcam
+3. **Start Surveillance**: Click "▶️ Start Surveillance"
+4. **Monitor Alerts**: Watch the Alert Log panel for weapon/crowd/bag detections
+
+## Models
+
+### Firearm Detection Model (Default)
+- **Source**: [Subh775/Firearm_Detection_Yolov8n](https://huggingface.co/Subh775/Firearm_Detection_Yolov8n)
+- **Accuracy**: 89% mAP@0.5
+- **Classes**: Gun
+- **Performance**: ~4ms per image on GPU
+
+### Local COCO Model (Alternative)
+- **Classes**: 80 COCO classes (person, knife, scissors, bags, etc.)
+- **Note**: Does NOT detect guns
 
 ## Configuration
 
-You can adjust the following in the sidebar:
-- **Confidence Threshold**: Minimum confidence for detections.
-- **Crowd Threshold**: Number of people to trigger a crowd alert.
-- **Bag Stationary Limit**: Seconds a bag must be stationary to trigger an alert.
-- **Weapon Persistence**: Number of consecutive frames a weapon must be detected to trigger an alert.
+Key settings in `src/streamlit_app.py`:
+
+```python
+CONF_THRESHOLD = 0.15          # Detection confidence threshold
+WEAPON_PERSIST_FRAMES = 2      # Frames before weapon alert
+CROWD_THRESHOLD = 20           # People count for crowd alert
+BAG_STATIONARY_SECONDS = 5     # Time before bag alert
+```
+
+## How It Works
+
+1. **Detection**: YOLOv8 detects objects in each frame
+2. **Tracking**: DeepSORT tracks objects across frames
+3. **Rules Engine**: Analyzes tracks for anomalies
+4. **Alerts**: Triggers alerts based on configured rules
+5. **Visualization**: Displays annotated video with alerts
+
+## Requirements
+
+- Python 3.8+
+- Webcam (optional, for live detection)
+- GPU recommended for better performance
+
+## Technologies
+
+- **YOLOv8** - Object detection
+- **DeepSORT** - Multi-object tracking
+- **Streamlit** - Web dashboard
+- **OpenCV** - Video processing
+- **Hugging Face** - Model hosting
+
+## License
+
+MIT License
+
+## Credits
+
+- Firearm detection model by [Subh775](https://huggingface.co/Subh775)
+- Built with Ultralytics YOLOv8

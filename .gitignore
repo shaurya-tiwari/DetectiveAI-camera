@@ -11,3 +11,4 @@ outputs/
 !videos/sample.mp4
 weights/
 yolov8n.pt
+best.pt

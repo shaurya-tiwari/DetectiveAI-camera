@@ -61,7 +61,7 @@ class RuleEngine:
                 persons_tracked[tid] = {"bbox": (x1,y1,x2,y2), "center": (cx,cy)}
             elif name in ["backpack", "handbag", "suitcase", "bag"]:
                 bags_tracked[tid] = {"bbox": (x1,y1,x2,y2), "center": (cx,cy)}
-            elif name in ["knife", "gun", "weapon", "scissors"]: # Add more if needed
+            elif name.lower() in ["knife", "gun", "weapon", "scissors"]:  # Case-insensitive matching
                 weapon_candidates[tid] = {"bbox": (x1,y1,x2,y2), "center": (cx,cy), "name": name}
 
         # Cleanup old state
