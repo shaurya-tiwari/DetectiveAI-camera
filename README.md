@@ -94,11 +94,4 @@ BAG_STATIONARY_SECONDS = 5     # Time before bag alert
 - **OpenCV** - Video processing
 - **Hugging Face** - Model hosting
 
-## License
 
-MIT License
-
-## Credits
-
-- Firearm detection model by [Subh775](https://huggingface.co/Subh775)
-- Built with Ultralytics YOLOv8
