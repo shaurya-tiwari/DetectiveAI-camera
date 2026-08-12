@@ -313,10 +313,13 @@ if st.session_state.running and video_path is not None:
             video_placeholder.image(frame_rgb, channels="RGB", width="stretch")
 
             # Update status panel
+            latency = detector.latency_stats()
+            lat_str = f"{latency['avg_ms']} ms" if latency['avg_ms'] else "—"
             status_placeholder.markdown(f"""
             <div class="stat-row"><span class="stat-label">Status</span><span class="badge-running">Running</span></div>
             <div class="stat-row"><span class="stat-label">Frame</span><span class="stat-value">{frame_idx}</span></div>
             <div class="stat-row"><span class="stat-label">FPS</span><span class="stat-value">{fps:.1f}</span></div>
+            <div class="stat-row"><span class="stat-label">Inference</span><span class="stat-value">{lat_str}</span></div>
             <div class="stat-row"><span class="stat-label">Active Tracks</span><span class="stat-value">{len(tracks)}</span></div>
             """, unsafe_allow_html=True)
 
