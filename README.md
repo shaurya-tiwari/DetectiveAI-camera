@@ -1,4 +1,4 @@
-# Intelligent Surveillance System
+# 🎯 SentinelAI — Intelligent Surveillance System
 
 Real-time weapon, crowd, and unattended bag detection powered by **YOLOv8 + DeepSORT + Streamlit**.
 
@@ -6,148 +6,183 @@ Real-time weapon, crowd, and unattended bag detection powered by **YOLOv8 + Deep
 
 ## 📌 What This Project Does
 
-SentinelAI is an AI-powered surveillance dashboard that:
-- Reads live video from a **file, upload, or webcam**
-- Detects **weapons (pistol, knife)** in every frame
-- **Tracks** detected objects across frames with persistent IDs
-- **Fires smart alerts** when a weapon appears for 3+ consecutive frames
-- Displays everything in a **live browser dashboard**
+SentinelAI is a real-time smart surveillance system designed to monitor CCTV / camera feeds and automatically alert security personnel when anomalies occur:
+- 🔫 **Weapon Detection:** Identifies firearms (pistols, rifles) and sharp objects (knives).
+- 🎒 **Unattended Bag Detection:** Alerts if a bag is left alone without its owner nearby.
+- 👥 **Crowd Detection:** Monitors group density and flags overcrowded areas.
+- 🥊 **Altercation Detection (Planned):** Detects physical fights or aggressive behavior.
 
 ---
 
-## 🧠 How It Works — Full Pipeline
+## 🧠 How It Works — End-to-End Pipeline
 
 ```
-[ Video File / Webcam ]
-        │
-        ▼ (OpenCV reads frame-by-frame)
-┌─────────────────────────────────────┐
-│  STEP 1 — Detection (detection.py)  │
-│  YOLOv8 ONNX model scans the frame  │
-│  Output: [x1,y1,x2,y2, conf, class] │
-└──────────────┬──────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────┐
-│  STEP 2 — Tracking (tracking.py)    │
-│  DeepSORT links detections across   │
-│  frames — assigns persistent IDs    │
-│  Output: Track ID + bounding box    │
-└──────────────┬──────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────┐
-│  STEP 3 — Rules Engine (rules.py)   │
-│  Checks: weapon seen 3+ frames?     │
-│  Checks: bag stationary & alone?    │
-│  Checks: 20+ people in frame?       │
-│  Output: Alert list                 │
-└──────────────┬──────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────┐
-│  STEP 4 — Visualize (visualize.py)  │
-│  Draws bounding boxes + alert text  │
-│  on frame using OpenCV              │
-└──────────────┬──────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────┐
-│  STEP 5 — Dashboard (streamlit_app) │
-│  Streams annotated frames to browser│
-│  Updates Alert Log & System Status  │
-└─────────────────────────────────────┘
+┌─────────────────┐
+│ Camera / Video  │ (Input: MP4, Upload, or Live Webcam)
+└────────┬────────┘
+         │  Frame-by-Frame (OpenCV)
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 1. DETECTION (src/detection.py)                             │
+│    YOLOv8 ONNX model scans the frame                        │
+│    ➜ Detects bounding boxes (x1, y1, x2, y2), conf, class   │
+└────────┬────────────────────────────────────────────────────┘
+         │  Detections list
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 2. TRACKING (src/tracking.py)                               │
+│    DeepSORT assigns unique persistent IDs (e.g., ID #3)     │
+│    ➜ Remembers objects across frames even when moving       │
+└────────┬────────────────────────────────────────────────────┘
+         │  Tracked Objects with IDs
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 3. RULES ENGINE (src/rules.py)                              │
+│    Evaluates business logic & rules (3-frame weapon check,  │
+│    unattended bag timer, crowd counting)                    │
+└────────┬────────────────────────────────────────────────────┘
+         │  Active Alerts
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 4. VISUALIZATION & DASHBOARD (src/visualize.py & app)       │
+│    Draws boxes + text overlay on frame                      │
+│    ➜ Streams live video feed & alerts to Streamlit UI       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📁 Project Structure
+## 💡 Core Logic & Decision Rules (How the AI Thinks)
+
+The system doesn't just guess; it follows precise, intelligent rules built into `src/rules.py` to avoid false alarms:
+
+### 1. 🔫 Weapon Alert Logic (`src/rules.py`)
+> **Goal:** Detect guns/knives quickly while ignoring 1-frame glitches or false flickers.
+
+```
+Frame 1: Pistol detected (Conf > 0.20) ──► Counter = 1 (No alert yet)
+Frame 2: Pistol detected               ──► Counter = 2 (No alert yet)
+Frame 3: Pistol detected               ──► Counter = 3 ──► 🚨 TRIGGER WEAPON ALERT!
+```
+- **Rule:** A weapon must be detected for **3 consecutive frames** (`WEAPON_PERSIST_FRAMES = 3`).
+- **Why?** Prevents random visual noise or single-frame glitches from triggering false alarms.
+- **Cooldown:** Once alerted, enforces a **5-second cooldown** per object ID so it doesn't spam alerts every millisecond.
+
+---
+
+### 2. 🎒 Unattended Bag Logic (`src/rules.py`)
+> **Goal:** Flag suspicious luggage or backpacks left behind by owners.
+
+```
+Is a Bag detected?
+   │
+   ├──► Is the Bag stationary? (Moved < 10 pixels over time)
+   │       │
+   │       ├──► YES ──► Is there a Person within 150 pixels of the bag?
+   │       │               │
+   │       │               ├──► YES ──► Owner is present ──► RESET TIMER ⏱️
+   │       │               │
+   │       │               └──► NO  ──► Bag is ALONE! ──► Start / Increment Timer ⏱️
+   │       │                                                  │
+   │       │                                                  └──► Timer >= 5 Seconds? (Configurable to 5 min)
+   │       │                                                          │
+   │       │                                                          └──► 🚨 TRIGGER UNATTENDED BAG ALERT!
+   │       │
+   │       └──► NO (Bag is moving) ──► Someone is carrying it ──► RESET TIMER ⏱️
+```
+- **Step 1 — Stationary Check:** Tracks bag center point `(cx, cy)`. If it moves > 10 pixels, it's being carried (timer resets).
+- **Step 2 — Proximity Check:** Measures distance between bag center and all detected people. If any person is within **150 pixels**, the owner is nearby.
+- **Step 3 — Timer Threshold:** If the bag stays stationary AND alone for `BAG_STATIONARY_SECONDS` (e.g. 5 seconds or 5 minutes), the alarm triggers!
+
+---
+
+### 3. 👥 Crowd Alert Logic (`src/rules.py`)
+> **Goal:** Monitor public safety and detect overcrowding in real time.
+
+```
+Count total active "Person" tracks in current frame
+   │
+   ├──► Count >= 20 people (CROWD_THRESHOLD = 20)
+   │       │
+   │       └──► 🚨 TRIGGER CROWD ALERT! ("Crowd detected: 24 people")
+   │
+   └──► Count < 20 people ──► Normal status (No alert)
+```
+- **Rule:** Whenever the number of tracked people in a single frame hits or exceeds `CROWD_THRESHOLD` (default: 20), an alert fires.
+- **Cooldown:** 10-second cooldown between crowd alerts to avoid log clutter.
+
+---
+
+## 📁 Project Structure & Codebase Mapping
 
 ```
 DetectiveAI-camera/
 ├── src/
-│   ├── detection.py       # YOLO ONNX inference wrapper
-│   ├── tracking.py        # DeepSORT multi-object tracker
-│   ├── rules.py           # Anomaly detection rules engine
-│   ├── visualize.py       # Bounding box + alert overlay
-│   └── streamlit_app.py   # Web dashboard (main entry point)
+│   ├── detection.py       # 🔍 Loads ONNX YOLOv8 model & extracts boxes + confidence
+│   ├── tracking.py        # 🎯 DeepSORT object tracker (assigns persistent IDs)
+│   ├── rules.py           # 🧠 Business Logic (Weapon persist, Bag timer, Crowd count)
+│   ├── visualize.py       # 🎨 Draws bounding boxes, IDs, and red alert text on frames
+│   └── streamlit_app.py   # 💻 Modern Streamlit Light Dashboard UI
 ├── models/
-│   └── best.onnx          # Trained weapon detection model
+│   └── best.onnx          # 🤖 Pre-trained YOLOv8 weapon detection model
 ├── videos/
-│   └── cam1.mp4           # Sample test video
-├── requirements.txt
-└── README.md
+│   └── cam1.mp4           # 📹 Test surveillance video footage
+├── requirements.txt       # 📦 Python dependency list
+└── README.md              # 📖 Project documentation
 ```
 
 ---
 
-## 🔬 Code — How Each Module Works
+## 🔬 Code Architecture — How Modules Work Together
 
 ### 1. Detection (`src/detection.py`)
-Loads the ONNX model and runs inference on every frame.
+Loads the lightweight ONNX model and auto-selects GPU if CUDA is available, otherwise CPU.
 
 ```python
-# Auto-selects GPU if available, falls back to CPU
+# Auto-detect hardware
 self.device = "0" if torch.cuda.is_available() else "cpu"
 self.model = YOLO("models/best.onnx", task="detect")
 
-# Run inference on a frame
-detections = self.model.predict(frame, conf=0.20, device=self.device)
-# Returns: [(x1, y1, x2, y2, confidence, "pistol"), ...]
+# Inference returns box coordinates, confidence score, and class label
+detections = detector.detect(frame, conf_threshold=0.20)
+# Output format: [(x1, y1, x2, y2, confidence, "pistol"), ...]
 ```
 
 ### 2. Tracking (`src/tracking.py`)
-DeepSORT assigns a persistent ID to each detected object across frames.
+Uses **DeepSORT** to assign a unique, persistent ID to every detected object across continuous frames.
 
 ```python
-# Convert [x1,y1,x2,y2] → [x1,y1,width,height] (DeepSORT format)
-ds_input = [([x1, y1, x2-x1, y2-y1], conf, name) for ...]
-tracks = DeepSort(n_init=1).update_tracks(ds_input, frame=frame)
+# DeepSORT updates track positions across frames
+tracks = tracker.update(detections, frame)
 
-# Each track has:
-track.track_id        # persistent ID e.g. "3"
-track.to_ltrb()       # [x1, y1, x2, y2]
-track.get_det_class() # "pistol"
-track.is_confirmed()  # True after n_init frames
+# Each track contains:
+track.track_id        # Unique persistent ID string e.g. "3"
+track.to_ltrb()       # Bounding box [x1, y1, x2, y2]
+track.get_det_class() # Class name e.g. "pistol"
 ```
 
 ### 3. Rules Engine (`src/rules.py`)
-Auto-detects which rules to run based on what the model can detect.
+Processes active tracks and applies safety rules. Auto-adapts based on model classes.
 
 ```python
-# On startup — reads model class names
-self.has_weapons = any("pistol" or "gun" or "knife" in class_names)
-self.has_persons = any("person" in class_names)
-self.has_bags    = any("bag" in class_names)
-
-# Weapon rule — only fires after 3 confirmed frames
-if weapon_seen_frames >= 3:
-    alerts.append({"type": "WEAPON", "message": "Weapon detected!"})
-```
-
-### 4. Visualization (`src/visualize.py`)
-Draws bounding boxes and alert text directly on the video frame.
-
-```python
-cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 200, 0), 2)
-cv2.putText(frame, f"ID:{tid} pistol", (x1, y1-10), ...)
+# Process tracks against rules every frame
+alerts = rules.process(tracks, frame_idx, frame_timestamp)
+# Returns list of alert dictionaries: [{"type": "WEAPON", "message": "..."}, ...]
 ```
 
 ---
 
-## ⚡ Performance
+## ⚡ Performance & Benchmarks
 
-| Hardware | Detection Latency | FPS |
-|---|---|---|
-| **NVIDIA GPU (CUDA)** | **~4 ms** | ~250 FPS |
-| **Apple Silicon (CPU)** | **~31 ms** | ~32 FPS |
-| **Intel CPU** | ~50–80 ms | ~15 FPS |
+| Hardware | Provider | Inference Latency | FPS |
+|---|---|---|---|
+| **NVIDIA GPU (CUDA)** | `CUDAExecutionProvider` | **~4 ms** | **~250 FPS** |
+| **Apple Silicon (CPU)** | `CPUExecutionProvider` | **~31 ms** | **~32 FPS** |
+| **Standard Intel CPU** | `CPUExecutionProvider` | ~50–80 ms | ~15–20 FPS |
 
-> GPU performance requires `onnxruntime-gpu` + CUDA installed.
-> Apple Silicon has no CUDA support — runs on CPU only.
-> 32 FPS on CPU is sufficient for real-time surveillance.
+> ℹ️ **Note on Mac vs GPU:** Apple Silicon chips do not support NVIDIA CUDA. On Mac, the system automatically uses optimized CPU execution (~31ms / 32 FPS), which is smooth and real-time. On NVIDIA GPUs with `onnxruntime-gpu`, latency drops to **4ms**.
 
-**To enable GPU (NVIDIA machines only):**
+To enable GPU on NVIDIA machines:
 ```bash
 uv pip uninstall onnxruntime
 uv pip install onnxruntime-gpu
@@ -155,184 +190,90 @@ uv pip install onnxruntime-gpu
 
 ---
 
-## 🤖 Model
+## 🤖 Model Specifications
 
-- **Model:** YOLOv8 exported to ONNX format
-- **Source:** [Hadi959/weapon-detection-yolov8](https://huggingface.co/Hadi959/weapon-detection-yolov8)
+- **Format:** ONNX (`best.onnx`) — highly optimized for production inference without heavy PyTorch overhead.
 - **Classes:** `pistol`, `knife`
-- **Format:** `.onnx` (runs via ONNXRuntime — no PyTorch needed at inference)
+- **Source:** Trained on public weapon detection datasets ([Hadi959/weapon-detection-yolov8](https://huggingface.co/Hadi959/weapon-detection-yolov8)).
 - **Size:** ~12 MB
-
-### Swapping the model
-Drop any `.onnx` file into `models/` and update one line:
-```python
-# src/streamlit_app.py
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "your_model.onnx")
-```
-Rules auto-adapt to whatever classes the new model has.
 
 ---
 
-## 🚀 Setup & Run
+## 🚀 Quickstart & Setup
 
-### Step 1 — Install uv (if not installed)
-```bash
-pip install uv
-```
-
-### Step 2 — Create virtual environment
+### Step 1 — Create Virtual Environment
 ```bash
 cd DetectiveAI-camera
 uv venv --python 3.11
 source .venv/bin/activate
 ```
 
-### Step 3 — Install packages
+### Step 2 — Install Dependencies
 ```bash
 uv pip install ultralytics streamlit opencv-python-headless numpy \
                deep-sort-realtime torch pillow onnxruntime "setuptools<70" onnx
 ```
 
-### Step 4 — Run
+### Step 3 — Run the Dashboard
 ```bash
 streamlit run src/streamlit_app.py
 ```
-
-Open `http://localhost:8501` in your browser.
+Open **`http://localhost:8501`** in your browser.
 
 ---
 
-## 🎛️ Configuration
+## 🎛️ Key Configuration Parameters
 
-All key settings in `src/streamlit_app.py`:
+In `src/streamlit_app.py`:
 
 ```python
-CONF_THRESHOLD = 0.20        # Min confidence to accept a detection (0–1)
-CROWD_THRESHOLD = 20         # Person count to trigger crowd alert
-BAG_STATIONARY_SECONDS = 5   # Seconds before unattended bag alert
-WEAPON_PERSIST_FRAMES = 3    # Consecutive frames before weapon alert fires
+CONF_THRESHOLD = 0.20        # Confidence cutoff for detections (0.0 to 1.0)
+WEAPON_PERSIST_FRAMES = 3    # Frames weapon must persist before alert triggers
+BAG_STATIONARY_SECONDS = 5   # Time bag must be alone & still before alert
+CROWD_THRESHOLD = 20         # Number of people required to trigger crowd alert
 ```
 
 ---
 
-## 📹 Video Sources
+## 🔭 Current Scope vs 🚀 Future Roadmap
 
-| Source | How to use |
-|---|---|
-| **Sample Video** | Drop `.mp4/.avi/.mov` into `videos/` → select from dropdown |
-| **Upload Video** | Click Browse in sidebar → pick any video file |
-| **Webcam** | Select Webcam → allow camera permission → Start |
+### Current Scope (Today)
+The codebase architecture in `src/rules.py` is **100% complete** for all 4 alert types. The active model loaded (`best.onnx`) is trained specifically on **weapons** (`pistol`, `knife`).
 
----
-
-## 🧩 Tech Stack
-
-| Library | Role |
-|---|---|
-| **YOLOv8 (Ultralytics)** | Object detection neural network |
-| **ONNXRuntime** | Runs the `.onnx` model efficiently |
-| **DeepSORT** | Multi-object tracking across frames |
-| **OpenCV** | Video reading, frame processing, drawing |
-| **Streamlit** | Browser-based live dashboard |
-| **PyTorch** | GPU/CPU tensor backend |
-| **NumPy** | Bounding box coordinate arrays |
-
----
-
-## ❓ Common Issues
-
-| Error | Fix |
-|---|---|
-| `No module named 'onnxruntime'` | `uv pip install onnxruntime` |
-| `No module named 'pkg_resources'` | `uv pip install "setuptools<70"` |
-| `streamlit: command not found` | Activate venv first: `source .venv/bin/activate` |
-| Wrong detections | Raise `CONF_THRESHOLD` to `0.40` or swap to a better model |
-| Black webcam screen | Allow camera in System Settings → Privacy → Camera |
-
----
-
-## 📊 Alert Types
-
-| Alert | Trigger Condition |
-|---|---|
-| `WEAPON` | Pistol/knife detected for 3+ consecutive frames |
-| `CROWD` | 20+ people visible simultaneously |
-| `UNATTENDED_BAG` | Bag stationary for 5s with no person within 150px |
-
-> **Note:** CROWD and UNATTENDED_BAG alerts only activate if the loaded model has those classes. Current model (`pistol`, `knife`) only triggers WEAPON alerts.
-
----
-
-## 🔭 Current Scope — What We Detect Today
-
-The system is **fully architected** for all 4 alert types. The rules engine, tracking, and UI are ready for all of them. What limits us today is the **model** — our current model was only trained on 2 classes:
-
-| Alert Type | Status | Reason |
+| Feature | Code Status | Current Model Status |
 |---|---|---|
-| 🔫 **Weapon (pistol/knife)** | ✅ **Working** | Model trained on guns + knives |
-| 👥 **Crowd Detection** | ⏳ Ready, needs model | No "person" class in current model |
-| 🎒 **Unattended Bag** | ⏳ Ready, needs model | No "bag" class in current model |
-| 🥊 **Altercation / Fight** | ⏳ Ready, needs model | No "fight" class in current model |
-
-> The code for ALL four rules is already written. Swapping to a richer model (e.g. trained on person + bag + weapons) will automatically activate all alerts — zero code changes needed.
+| 🔫 **Weapon Detection** | ✅ Complete | ✅ Active & Working |
+| 👥 **Crowd Detection** | ✅ Complete | ⏳ Ready (Requires model with `person` class) |
+| 🎒 **Unattended Bag** | ✅ Complete | ⏳ Ready (Requires model with `bag` class) |
+| 🥊 **Altercation Detection** | ✅ Complete | ⏳ Ready (Requires model with `fight` class) |
 
 ---
 
-## 🚀 Future Plans
+### Future Roadmap
 
-### Phase 1 — Multi-class Model Training
-Train a custom YOLOv8 model on a larger combined dataset:
-- **Weapons:** pistol, rifle, knife, taser
-- **People:** person (for crowd counting)
-- **Bags:** backpack, suitcase, handbag (for unattended bag detection)
-- **Altercation:** fighting, physical contact scenes
+#### Phase 1 — Combined Multi-Class Model
+Train a unified YOLOv8 model combining weapons, people, bags, and altercation poses so all 4 rules run simultaneously under one model.
 
-This single model upgrade will unlock all 4 alert types instantly.
+#### Phase 2 — Context-Aware Role Classification ("Smart Skip")
+> *"Not every gun is a threat — ignore authorized personnel."*
 
----
-
-### Phase 2 — Context-Aware Detection (Smart Skip)
-> *"Not every gun is a threat"*
-
-Teach the system to **ignore authorized personnel** carrying weapons:
-
-- 👮 **Skip police officers** — detect uniform + badge alongside gun → suppress alert
-- 🔒 **Skip security guards** — detect security vest + ID badge → suppress alert
-- 🏥 **Skip medical staff** — context-aware role classification
-
-This requires a **role classification model** running alongside weapon detection — classifying the *person holding the weapon*, not just the weapon itself.
+Integrate a second classifier to check if the person holding the weapon is an authorized officer:
+- 👮 **Police Officer:** Detects uniform/badge ──► **Suppress Alert**
+- 🔒 **Security Guard:** Detects guard vest/ID ──► **Suppress Alert**
+- 🦹 **Unidentified Person:** No uniform detected ──► **🚨 Fire Weapon Alert**
 
 ```
-Weapon detected
-      │
-      ▼
-Is the holder wearing a uniform? ──Yes──► Suppress alert (authorized)
-      │
-     No
-      │
-      ▼
-🚨 Fire WEAPON alert
+Weapon Detected!
+       │
+       ▼
+Classify Person Holding Weapon
+       │
+       ├──► Uniform / Security Badge Recognized ──► Suppress Alert (Authorized)
+       │
+       └──► Civilian / Unidentified ──► 🚨 FIRE WEAPON ALERT
 ```
 
----
-
-### Phase 3 — Advanced Features
-
-| Feature | Description |
-|---|---|
-| **Fight / Altercation detection** | Detect aggressive physical contact using pose estimation |
-| **Abandoned object tracking** | Track bags left behind even after the person leaves frame |
-| **License plate recognition** | Link vehicle plates to alert events |
-| **Multi-camera support** | Monitor multiple CCTV feeds simultaneously |
-| **Alert history export** | Save alert logs to CSV / PDF reports |
-| **SMS / Email notifications** | Push real-time alerts to security personnel |
-| **GPU acceleration** | Switch to `onnxruntime-gpu` for ~4ms latency on NVIDIA hardware |
-
----
-
-### Phase 4 — Deployment
-- Package as a **Docker container** for easy deployment on any CCTV server
-- Support **RTSP streams** from real IP cameras
-- Deploy on **NVIDIA Jetson** edge devices for on-site inference
-- Cloud dashboard with **multi-site monitoring**
-
+#### Phase 3 — Edge Deployment & Multi-Camera
+- **Dockerization:** Containerize app for seamless server deployment.
+- **RTSP IP Camera Streams:** Connect directly to commercial CCTV networks.
+- **NVIDIA Jetson Deployment:** Run inference directly on edge hardware for 4ms low latency.
