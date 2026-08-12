@@ -10,7 +10,8 @@ except Exception:
 class Tracker:
     def __init__(self, max_age=30):
         if HAS_DEEPSORT:
-            self.tracker = DeepSort(max_age=max_age)
+            # Set n_init=1 so tracks confirm on first detection
+            self.tracker = DeepSort(max_age=max_age, n_init=1)
             self.use_deepsort = True
         else:
             self.use_deepsort = False
@@ -28,7 +29,8 @@ class Tracker:
           - get_det_class()
         """
         if self.use_deepsort:
-            ds_input = [((x1,y1,x2,y2), conf, name) for (x1,y1,x2,y2,conf,name) in detections]
+            # DeepSort expects LTWH: [x1, y1, width, height]
+            ds_input = [([x1, y1, x2 - x1, y2 - y1], conf, name) for (x1, y1, x2, y2, conf, name) in detections]
             tracks = self.tracker.update_tracks(ds_input, frame=frame)
             return tracks
         else:

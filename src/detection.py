@@ -8,7 +8,7 @@ class Detector:
             raise RuntimeError("Install ultralytics: pip install ultralytics")
         import torch
         self.device = device if device is not None else ("0" if torch.cuda.is_available() else "cpu")
-        self.model = YOLO(model_path)
+        self.model = YOLO(model_path, task="detect")
         self.names = getattr(self.model, "names", None)
         self.class_remap = {}
 
@@ -24,19 +24,18 @@ class Detector:
         if hasattr(r, "boxes") and r.boxes is not None:
             for box in r.boxes:
                 try:
-                    cls_i = int(box.cls.cpu().detach().numpy())
-                    conf = float(box.conf.cpu().detach().numpy())
-                    xyxy = box.xyxy[0].cpu().detach().numpy().astype(int)
+                    # Extract scalar values safely using PyTorch .item()
+                    cls_i = int(box.cls[0].item()) if hasattr(box.cls, "__len__") and len(box.cls) > 0 else int(box.cls.item())
+                    conf = float(box.conf[0].item()) if hasattr(box.conf, "__len__") and len(box.conf) > 0 else float(box.conf.item())
+                    
+                    # Extract box coordinates xyxy
+                    xyxy_tensor = box.xyxy[0] if box.xyxy.ndim > 1 else box.xyxy
+                    xyxy = xyxy_tensor.cpu().numpy().astype(int)
+                    x1, y1, x2, y2 = int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])
                 except Exception:
-                    # fallback parsing
-                    try:
-                        cls_i = int(np.array(box.cls).astype(int))
-                        conf = float(np.array(box.conf).astype(float))
-                        xyxy = np.array(box.xyxy[0]).astype(int)
-                    except Exception:
-                        continue
-                x1, y1, x2, y2 = int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])
-                # resolve name
+                    continue
+
+                # resolve class name
                 if isinstance(self.names, dict):
                     name = self.names.get(cls_i, str(cls_i))
                 elif isinstance(self.names, (list, tuple)):
@@ -46,8 +45,10 @@ class Detector:
                         name = str(cls_i)
                 else:
                     name = str(cls_i)
+
                 name = name.lower()
                 if self.class_remap and name in self.class_remap:
                     name = self.class_remap[name]
+
                 detections.append((x1, y1, x2, y2, float(conf), name))
         return detections
