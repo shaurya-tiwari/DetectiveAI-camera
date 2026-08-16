@@ -19,6 +19,8 @@ import time
 # │  Output: frame with boxes drawn on it                            │
 # └──────────────────────────────────────────────────────────────────┘
 def draw_tracks(frame, tracks):
+    # 📌 KEY CONCEPT: Defensive Copy (frame.copy())
+    # We draw on a copy, not the original frame — prevents side-effects if the frame is reused elsewhere
     out = frame.copy()
 
     for t in tracks:
@@ -31,6 +33,8 @@ def draw_tracks(frame, tracks):
             tid  = getattr(t, "track_id", None)
             name = t.get_det_class() if hasattr(t, "get_det_class") else "obj"
 
+            # 📌 KEY CONCEPT: OpenCV Drawing API (Mutable In-Place Operations)
+            # cv2.rectangle and cv2.putText modify the numpy array in place — very fast, no new allocations
             # Draw the box (yellow colour)
             cv2.rectangle(out, (x1, y1), (x2, y2), (255, 200, 0), 2)
 
@@ -54,10 +58,14 @@ def draw_tracks(frame, tracks):
 # │  Output: frame with alert text overlaid                          │
 # └──────────────────────────────────────────────────────────────────┘
 def draw_alerts(frame, alerts):
+    # 📌 KEY CONCEPT: Defensive Copy + List Slicing [:5]
+    # Drawing on a copy avoids mutating the original frame; [:5] caps output to prevent UI overflow
     out = frame.copy()
     y = 20  # Starting Y position for first line of text
 
     for a in alerts[:5]:  # Show max 5 alerts on-screen at once
+        # 📌 KEY CONCEPT: Unix Timestamp → Human-Readable Time (time.strftime)
+        # Alert timestamps are stored as float seconds (Unix epoch) — strftime formats them for display
         # Format: "20:13:07 [WEAPON] Weapon (pistol) detected!"
         ts  = time.strftime('%H:%M:%S', time.localtime(a['timestamp']))
         txt = f"{ts} [{a['type']}] {a['message']}"

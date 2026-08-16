@@ -19,6 +19,8 @@ class Detector:
     # │    • img_size=320 instead of 640     → ~2x faster        │
     # └──────────────────────────────────────────────────────────┘
     def __init__(self, model_path="yolov8n.pt", device=None):
+        # 📌 KEY CONCEPT: Conditional Expression (Ternary Operator)
+        # Checks if CUDA GPU is available — selects "0" (GPU) or "cpu" without a full if-else block
         try:
             from ultralytics import YOLO
         except Exception:
@@ -31,15 +33,21 @@ class Detector:
         # On NVIDIA: uses GPU → much faster
         self.device = device if device is not None else ("0" if torch.cuda.is_available() else "cpu")
 
+        # 📌 KEY CONCEPT: ONNX Runtime Model Loading
+        # ONNX is a hardware-independent model format — same file runs on GPU or CPU without code changes
         # Load the ONNX model from disk
         self.model = YOLO(model_path, task="detect")
 
+        # 📌 KEY CONCEPT: Dictionary (HashMap) for Class Index → Name Mapping
+        # self.names = {0: "pistol", 1: "knife"} — O(1) lookup to resolve integer class IDs to strings
         # Store class names: e.g. {0: "pistol", 1: "knife"}
         self.names = getattr(self.model, "names", None)
 
         # Optional: rename class labels (not used currently)
         self.class_remap = {}
 
+        # 📌 KEY CONCEPT: Sliding Window List (Rolling Log)
+        # Only the last 30 inference times are kept — old values removed with pop(0) to keep memory constant
         # Latency tracking — running average over last 30 frames
         self._latency_log = []
 
@@ -59,6 +67,8 @@ class Detector:
     # │    post-processing (box parsing) ← ~5% of time              │
     # └──────────────────────────────────────────────────────────────┘
     def detect(self, frame, conf_threshold=0.25, img_size=640):
+        # 📌 KEY CONCEPT: High-Resolution Timer (time.perf_counter)
+        # More accurate than time.time() — used for millisecond-level latency measurement
 
         # ── STEP 1: Run model inference — this is the slow part ────────
         # img_size=640 → standard, balanced accuracy vs speed
@@ -73,6 +83,8 @@ class Detector:
             verbose=False
         )
 
+        # 📌 KEY CONCEPT: Sliding Window List (Rolling Log)
+        # Only last 30 samples are kept — pop(0) removes oldest entry to maintain constant memory usage
         # ── Measure and log how long inference took ─────────────────────
         inference_ms = (time.perf_counter() - t0) * 1000
         self._latency_log.append(inference_ms)
@@ -85,6 +97,8 @@ class Detector:
         r = results[0]
         detections = []
 
+        # 📌 KEY CONCEPT: Tensor → NumPy Conversion + Type Safety
+        # PyTorch tensors cannot be used directly in OpenCV — .cpu().numpy() converts them to NumPy arrays
         # ── STEP 2: Parse boxes — fast, ~1ms ───────────────────────────
         if hasattr(r, "boxes") and r.boxes is not None:
             for box in r.boxes:
@@ -101,6 +115,8 @@ class Detector:
                 except Exception:
                     continue  # Skip bad boxes
 
+                # 📌 KEY CONCEPT: HashMap O(1) Lookup
+                # Resolving class index (int) → class name (string) — dict lookup is instant regardless of size
                 # ── Resolve class index → class name ───────────────────
                 if isinstance(self.names, dict):
                     name = self.names.get(cls_i, str(cls_i))
@@ -118,6 +134,8 @@ class Detector:
                 if self.class_remap and name in self.class_remap:
                     name = self.class_remap[name]
 
+                # 📌 KEY CONCEPT: List of Tuples (Structured Output)
+                # Each detection is a tuple: (x1, y1, x2, y2, confidence, class_name) — fixed-width, fast to unpack
                 # Add to results
                 detections.append((x1, y1, x2, y2, float(conf), name))
 
@@ -131,6 +149,8 @@ class Detector:
     # │  Output: {"avg_ms": 31.3, "min_ms": 24.1, "device": "cpu"}  │
     # └──────────────────────────────────────────────────────────────┘
     def latency_stats(self):
+        # 📌 KEY CONCEPT: Aggregation on a List (Mean + Min)
+        # sum(list)/len(list) = rolling average — min() gives best-case (fastest frame) for benchmarking
         if not self._latency_log:
             return {"avg_ms": None, "min_ms": None, "device": self.device}
         avg = sum(self._latency_log) / len(self._latency_log)

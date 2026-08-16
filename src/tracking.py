@@ -25,6 +25,8 @@ class Tracker:
     # │  Init DeepSORT or fallback centroid tracker              │
     # └──────────────────────────────────────────────────────────┘
     def __init__(self, max_age=30):
+        # 📌 KEY CONCEPT: Graceful Fallback Pattern
+        # If DeepSORT is not installed, system falls back to a simpler centroid tracker — never crashes
         if HAS_DEEPSORT:
             # n_init=1 → confirm track on first detection (no delay)
             self.tracker = DeepSort(max_age=max_age, n_init=1)
@@ -49,8 +51,10 @@ class Tracker:
     # └──────────────────────────────────────────────────────────────────┘
     def update(self, detections, frame):
 
-        # ── DeepSORT Path ─────────────────────────────────────────────
+        # ── DeepSORT Path ───────────────────────────────────────────────
         if self.use_deepsort:
+            # 📌 KEY CONCEPT: Format Conversion (xyxy → xywh)
+            # DeepSORT expects [x1, y1, width, height] not corner coords — simple arithmetic transform
             # DeepSORT needs [x1, y1, width, height] not [x1,y1,x2,y2]
             ds_input = [
                 ([x1, y1, x2 - x1, y2 - y1], conf, name)
@@ -59,11 +63,13 @@ class Tracker:
             tracks = self.tracker.update_tracks(ds_input, frame=frame)
             return tracks
 
-        # ── Fallback Centroid Tracker ──────────────────────────────────
+        # ── Fallback Centroid Tracker ────────────────────────────────────
         else:
             new_objects = {}
             centroids = []
 
+            # 📌 KEY CONCEPT: Centroid Computation
+            # Center of a bounding box = midpoint of corners — single point representing each object
             # Compute center point of each detected box
             for (x1, y1, x2, y2, conf, name) in detections:
                 cx = int((x1 + x2) / 2)
@@ -72,6 +78,8 @@ class Tracker:
 
             unmatched = set(self.objects.keys())
 
+            # 📌 KEY CONCEPT: Greedy Nearest-Neighbour Matching (O(N²))
+            # Each new detection is matched to the closest existing track using Euclidean distance
             # ── Match each detection to nearest existing tracked object ──
             for det, centroid in centroids:
                 best_id, best_dist = None, 1e9
@@ -101,6 +109,8 @@ class Tracker:
                     "hits": self.objects.get(oid, {}).get("hits", 0) + 1
                 }
 
+            # 📌 KEY CONCEPT: Max-Age Dead Reckoning (Track Persistence)
+            # Tracks that had no matching detection are kept alive up to max_age frames — handles brief occlusions
             # ── Keep unmatched objects alive for max_age frames ──────────
             for oid in unmatched:
                 obj = self.objects.get(oid)
@@ -111,7 +121,10 @@ class Tracker:
 
             self.objects = new_objects
 
-            # ── Wrap raw dicts into track-like objects ───────────────────
+            # 📌 KEY CONCEPT: Adapter / Wrapper Class (SimpleTrack)
+            # Wraps a plain dict into an object with the same interface as DeepSORT tracks —
+            # so the rest of the pipeline (rules.py, visualize.py) works identically for both trackers
+            # ── Wrap raw dicts into track-like objects ─────────────────────
             class SimpleTrack:
                 def __init__(self, tid, obj):
                     self.track_id = tid
