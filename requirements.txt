@@ -9,5 +9,6 @@ streamlit-webrtc
 av
 requests
 python-dotenv
+setuptools
 
 # pip install -U ultralytics opencv-python streamlit huggingface_hub deep_sort_realtime

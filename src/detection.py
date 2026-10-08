@@ -28,8 +28,15 @@ class Detector:
 
         import torch
 
-        # Auto-pick GPU if CUDA available, else CPU
-        self.device = device if device is not None else ("0" if torch.cuda.is_available() else "cpu")
+        # Auto-pick best hardware: NVIDIA GPU (0), Apple Silicon (mps), or CPU (cpu)
+        if device is not None:
+            self.device = device
+        elif torch.cuda.is_available():
+            self.device = "0"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            self.device = "mps"
+        else:
+            self.device = "cpu"
 
         # Load ONNX model
         self.model = YOLO(model_path, task="detect")

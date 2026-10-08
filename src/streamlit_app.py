@@ -35,13 +35,13 @@ st.set_page_config(page_title="SentinelAI", layout="wide", page_icon="🎯")
 # --- Custom CSS: Clean white modern light UI ---
 st.markdown("""
 <style>
-/* Import clean font */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+/* Executive Dashboard (Navy & Gold) */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap');
 
-/* Global white background */
 html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
-    background-color: #ffffff !important;
-    font-family: 'Inter', sans-serif;
+    background-color: #0b1121 !important;
+    font-family: 'Outfit', sans-serif;
+    color: #e2e8f0;
 }
 
 /* Hide default streamlit decoration */
@@ -49,116 +49,109 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
 
 /* Sidebar */
 [data-testid="stSidebar"] {
-    background-color: #f8f9fa !important;
-    border-right: 1px solid #e9ecef;
+    background-color: #161e31 !important;
+    border-right: 1px solid #1e293b;
 }
-[data-testid="stSidebar"] * { font-family: 'Inter', sans-serif; }
+[data-testid="stSidebar"] * { 
+    font-family: 'Outfit', sans-serif !important; 
+    color: #cbd5e1 !important;
+}
 
-/* Top header bar */
+/* Fix sidebar text color overrides */
+[data-testid="stSidebar"] button * { color: #ffffff !important; }
+[data-testid="stSidebar"] label { color: #e2e8f0 !important; }
+
+/* Top header */
 .sentinel-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 24px 0 8px 0;
-    border-bottom: 1px solid #f0f0f0;
+    gap: 16px;
+    padding: 20px 24px;
+    background: linear-gradient(145deg, #161e31, #0f1627);
+    border-radius: 12px;
+    border-bottom: 2px solid #d97706; /* Amber Gold accent */
     margin-bottom: 24px;
-}
-.sentinel-dot {
-    width: 10px; height: 10px;
-    background: #22c55e;
-    border-radius: 50%;
-    animation: pulse 2s infinite;
-}
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
 }
 .sentinel-title {
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 600;
-    color: #111827;
+    color: #f8fafc;
     margin: 0;
+    letter-spacing: 0.02em;
 }
 .sentinel-sub {
-    font-size: 13px;
-    color: #9ca3af;
+    font-size: 14px;
+    color: #94a3b8;
     margin: 0;
 }
 
 /* Section labels */
 .section-label {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
-    color: #9ca3af;
-    letter-spacing: 0.08em;
+    color: #94a3b8;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
 }
 
-/* Alert card */
+/* Alert card - Luxury Amber */
 .alert-card {
-    background: #fff7ed;
-    border-left: 3px solid #f97316;
-    border-radius: 6px;
-    padding: 10px 14px;
-    margin-bottom: 8px;
-    font-size: 13px;
-    color: #1f2937;
+    background: #1e293b;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    border: 1px solid #334155;
+    border-left: 4px solid #d97706;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);
 }
 .alert-card-time {
-    font-size: 11px;
-    color: #9ca3af;
-    margin-bottom: 2px;
+    font-size: 12px;
+    color: #94a3b8;
+    margin-bottom: 4px;
 }
-.alert-card-text { font-weight: 500; color: #111827; }
+.alert-card-text { 
+    font-size: 14px;
+    font-weight: 600; 
+    color: #fbbf24; 
+}
 
 /* Stat bar */
 .stat-row {
     display: flex;
     justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid #f3f4f6;
-    font-size: 13px;
+    padding: 12px 14px;
+    background: #161e31;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-.stat-label { color: #6b7280; }
-.stat-value { font-weight: 500; color: #111827; }
+.stat-label { color: #94a3b8; }
+.stat-value { font-weight: 600; color: #f8fafc; }
 
 /* Status badge */
 .badge-running {
     display: inline-block;
-    background: #dcfce7;
-    color: #16a34a;
+    background: rgba(217, 119, 6, 0.15);
+    color: #fbbf24;
     font-size: 11px;
     font-weight: 600;
-    padding: 2px 10px;
-    border-radius: 20px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(217, 119, 6, 0.3);
 }
 .badge-idle {
     display: inline-block;
-    background: #f3f4f6;
-    color: #6b7280;
+    background: rgba(148, 163, 184, 0.1);
+    color: #94a3b8;
     font-size: 11px;
     font-weight: 600;
-    padding: 2px 10px;
-    border-radius: 20px;
-}
-
-/* Video container */
-.video-wrap {
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid #e5e7eb;
-    background: #f9fafb;
-}
-
-/* Sidebar section header */
-.sidebar-section {
-    font-size: 11px;
-    font-weight: 600;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    margin: 16px 0 6px 0;
+    padding: 4px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
 }
 </style>
 """, unsafe_allow_html=True)
